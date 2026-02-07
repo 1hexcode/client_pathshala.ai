@@ -109,8 +109,12 @@ export function NoteViewPage() {
         );
     }
 
-    // file_url is now a full Supabase public URL
-    const fileUrl = note.file_url || null;
+    // In dev mode file_url is relative (/uploads/...), in prod it's a full Supabase URL
+    const fileUrl = note.file_url
+        ? note.file_url.startsWith('http')
+            ? note.file_url
+            : `${API_BASE}${note.file_url}`
+        : null;
     const isPdf = note.file_url?.toLowerCase().endsWith('.pdf');
 
     return (

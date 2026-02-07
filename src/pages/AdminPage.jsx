@@ -648,7 +648,7 @@ function NotesTab() {
                     <div className="flex gap-2">
                       {n.file_url && (
                         <a
-                          href={n.file_url}
+                          href={n.file_url?.startsWith('http') ? n.file_url : `${import.meta.env.VITE_API_URL}${n.file_url}`}
                           target="_blank"
                           rel="noreferrer"
                         >
