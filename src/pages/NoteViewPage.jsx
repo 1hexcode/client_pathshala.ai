@@ -4,7 +4,7 @@ import { Card, Button, Badge, Spinner } from '../components/common';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchNote, chatAboutNote } from '../utils/api';
 
-const API_BASE = 'https://likely-jolee-pathsalaai-8856d037.koyeb.app/';
+const API_BASE = import.meta.env.VITE_API_URL;
 
 /**
  * Lightweight markdown-to-HTML renderer for chat messages.
