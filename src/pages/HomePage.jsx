@@ -1,15 +1,24 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Card, Badge } from '../components/common';
-import { notes } from '../data/notes';
-import { colleges } from '../data/academics';
+import { Button, Card, Badge, Spinner } from '../components/common';
+import { fetchStats, fetchFavouriteColleges, fetchNotes } from '../utils/api';
 
 export function HomePage() {
-  const recentNotes = notes.filter(n => n.status === 'ready').slice(0, 4);
-  const stats = [
-    { label: 'Study Notes', value: '10,000+' },
-    { label: 'Active Students', value: '5,000+' },
-    { label: 'Subjects Covered', value: '200+' },
-    { label: 'AI Responses', value: '1M+' },
+  const [stats, setStats] = useState(null);
+  const [colleges, setColleges] = useState([]);
+  const [recentNotes, setRecentNotes] = useState([]);
+
+  useEffect(() => {
+    fetchStats().then(setStats).catch(() => { });
+    fetchFavouriteColleges().then(setColleges).catch(() => setColleges([]));
+    fetchNotes(null, 4).then(setRecentNotes).catch(() => setRecentNotes([]));
+  }, []);
+
+  const statItems = [
+    { label: 'Study Notes', value: stats ? stats.notes_count.toLocaleString() : '—' },
+    { label: 'Active Students', value: stats ? stats.students_count.toLocaleString() : '—' },
+    { label: 'Subjects Covered', value: stats ? stats.subjects_count.toLocaleString() : '—' },
+    { label: 'AI Responses', value: stats ? stats.ai_responses_count.toLocaleString() : '—' },
   ];
 
   return (
@@ -17,7 +26,7 @@ export function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br bg-black from-primary via-primary to-primary-dark py-20 lg:py-32">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.05%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50"></div>
-        
+
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <Badge variant="accent" className="mb-4">✨ New: AI-Powered Study Assistant</Badge>
@@ -26,7 +35,7 @@ export function HomePage() {
               <span className="text-accent">Not Harder</span>
             </h1>
             <p className="text-xl text-white/80 max-w-2xl mx-auto mb-8">
-              Access thousands of peer-reviewed study notes, get instant AI tutoring, 
+              Access thousands of peer-reviewed study notes, get instant AI tutoring,
               and connect with students from your college.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -45,10 +54,10 @@ export function HomePage() {
               </Link>
             </div>
           </div>
-          
+
           {/* Stats */}
           <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8">
-            {stats.map((stat) => (
+            {statItems.map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-3xl lg:text-4xl font-display font-bold text-white">{stat.value}</div>
                 <div className="text-white/60 mt-1">{stat.label}</div>
@@ -69,7 +78,7 @@ export function HomePage() {
               From study materials to AI assistance, we've got your academic journey covered.
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             <Card variant="elevated" className="text-center p-8">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
@@ -82,7 +91,7 @@ export function HomePage() {
                 Access thousands of curated notes organized by college, program, and subject. Download, view, and learn at your own pace.
               </p>
             </Card>
-            
+
             <Card variant="elevated" className="text-center p-8">
               <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -94,7 +103,7 @@ export function HomePage() {
                 Get instant help with homework, concepts, and exam prep. Our AI tutor is available 24/7 to answer your questions.
               </p>
             </Card>
-            
+
             <Card variant="elevated" className="text-center p-8">
               <div className="w-16 h-16 rounded-2xl bg-success/10 flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -121,22 +130,24 @@ export function HomePage() {
               Find notes specific to your academic program
             </p>
           </div>
-          
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {colleges.map((college) => (
-              <Link key={college.id} to={`/notes?college=${college.id}`}>
-                <Card interactive className="h-full p-6 hover:border-primary transition-colors">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                    <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
-                  <h3 className="font-display font-semibold text-foreground mb-1">{college.name}</h3>
-                  <p className="text-sm text-muted">{college.shortName}</p>
-                </Card>
-              </Link>
-            ))}
-          </div>
+
+          {colleges.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {colleges.map((college) => (
+                <Link key={college.id} to={`/notes?college=${college.id}`}>
+                  <Card interactive className="h-full p-6 hover:border-primary transition-colors">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 text-2xl">
+                      {college.icon || '🏛️'}
+                    </div>
+                    <h3 className="font-display font-semibold text-foreground mb-1">{college.name}</h3>
+                    <p className="text-sm text-muted">{college.short_name}</p>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted">No featured colleges yet. Admins can flag colleges as favourites.</p>
+          )}
         </div>
       </section>
 
@@ -154,53 +165,34 @@ export function HomePage() {
               <Button variant="outline">View All</Button>
             </Link>
           </div>
-          
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {recentNotes.map((note) => (
-              <Card key={note.id} interactive className="overflow-hidden">
-                <div className="aspect-[4/3] bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center">
-                  <svg className="w-16 h-16 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-medium text-foreground mb-1 line-clamp-1">{note.title}</h3>
-                  <p className="text-sm text-muted mb-3 line-clamp-2">{note.description}</p>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">{note.downloads} downloads</span>
-                    <div className="flex items-center gap-1 text-accent">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+
+          {recentNotes.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {recentNotes.map((note) => (
+                <Link key={note.id} to={`/notes/${note.id}`}>
+                  <Card interactive className="overflow-hidden">
+                    <div className="aspect-[4/3] bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center">
+                      <svg className="w-16 h-16 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      {note.rating.toFixed(1)}
                     </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                    <div className="p-4">
+                      <h3 className="font-medium text-foreground mb-1 line-clamp-1">{note.title}</h3>
+                      <p className="text-sm text-muted mb-3 line-clamp-2">{note.description || 'No description'}</p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted">{note.downloads} downloads</span>
+                        <span className="text-muted">{note.views} views</span>
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted py-8">No notes uploaded yet.</p>
+          )}
         </div>
       </section>
-
-      {/* CTA Section */}
-      {/* <section className="py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-display font-bold text-foreground mb-4">
-            Ready to Start Learning?
-          </h2>
-          <p className="text-lg text-muted mb-8">
-            Join thousands of students who are already studying smarter with PathshalaAI.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/signup">
-              <Button size="lg" variant="primary">Create Free Account</Button>
-            </Link>
-            <Link to="/summary">
-              <Button size="lg" variant="outline">Try AI Assistant</Button>
-            </Link>
-          </div>
-        </div>
-      </section> */}
     </div>
   );
 }

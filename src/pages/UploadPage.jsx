@@ -1,34 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Input, Select, Badge } from '../components/common';
 import { FileUpload } from '../components/notes';
-import { colleges, getProgramsByCollege, getSubjectsByProgram, years, semesters } from '../data/academics';
+import { fetchColleges, fetchPrograms, fetchSubjects, uploadNote } from '../utils/api';
 
 export function UploadPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+  const [apiError, setApiError] = useState('');
+
   const [formData, setFormData] = useState({
     file: null,
     title: '',
     description: '',
     collegeId: '',
     programId: '',
-    yearId: '',
-    semesterId: '',
+    semester: '',
     subjectId: '',
     tags: [],
   });
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState({});
 
-  const availablePrograms = formData.collegeId ? getProgramsByCollege(formData.collegeId) : [];
-  const availableSubjects = formData.programId ? getSubjectsByProgram(formData.programId) : [];
-  const availableSemesters = formData.yearId 
-    ? semesters.filter(s => s.yearId === formData.yearId)
-    : [];
+  // API-fetched data for cascading selects
+  const [colleges, setColleges] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+
+  // Fetch colleges on mount
+  useEffect(() => {
+    fetchColleges().then(setColleges).catch(() => setColleges([]));
+  }, []);
+
+  // Fetch programs when college changes
+  useEffect(() => {
+    if (formData.collegeId) {
+      fetchPrograms(formData.collegeId).then(setPrograms).catch(() => setPrograms([]));
+    } else {
+      setPrograms([]);
+    }
+  }, [formData.collegeId]);
+
+  // Fetch subjects when program + semester change
+  useEffect(() => {
+    if (formData.programId && formData.semester) {
+      fetchSubjects(formData.programId, formData.semester).then(setSubjects).catch(() => setSubjects([]));
+    } else {
+      setSubjects([]);
+    }
+  }, [formData.programId, formData.semester]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -37,24 +59,26 @@ export function UploadPage() {
       // Reset dependent fields
       if (name === 'collegeId') {
         updated.programId = '';
+        updated.semester = '';
         updated.subjectId = '';
       }
       if (name === 'programId') {
+        updated.semester = '';
         updated.subjectId = '';
       }
-      if (name === 'yearId') {
-        updated.semesterId = '';
+      if (name === 'semester') {
+        updated.subjectId = '';
       }
       return updated;
     });
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    setApiError('');
   };
 
   const handleFileSelect = (file) => {
     setFormData(prev => ({ ...prev, file }));
-    // Auto-fill title from filename
     if (!formData.title && file) {
       const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
       setFormData(prev => ({ ...prev, title: nameWithoutExt }));
@@ -78,12 +102,8 @@ export function UploadPage() {
 
   const validateStep1 = () => {
     const newErrors = {};
-    if (!formData.file) {
-      newErrors.file = 'Please select a file to upload';
-    }
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    }
+    if (!formData.file) newErrors.file = 'Please select a file to upload';
+    if (!formData.title.trim()) newErrors.title = 'Title is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -92,34 +112,47 @@ export function UploadPage() {
     const newErrors = {};
     if (!formData.collegeId) newErrors.collegeId = 'Required';
     if (!formData.programId) newErrors.programId = 'Required';
+    if (!formData.semester) newErrors.semester = 'Required';
     if (!formData.subjectId) newErrors.subjectId = 'Required';
-    if (!formData.yearId) newErrors.yearId = 'Required';
-    if (!formData.semesterId) newErrors.semesterId = 'Required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleNext = () => {
-    if (step === 1 && validateStep1()) {
-      setStep(2);
-    }
+    if (step === 1 && validateStep1()) setStep(2);
   };
 
   const handleSubmit = async () => {
     if (!validateStep2()) return;
-    
+
     setIsUploading(true);
-    
-    // Simulate upload progress
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      setUploadProgress(i);
+    setApiError('');
+
+    try {
+      const fd = new FormData();
+      fd.append('file', formData.file);
+      fd.append('title', formData.title);
+      fd.append('subject_id', formData.subjectId);
+      if (formData.description) fd.append('description', formData.description);
+      if (formData.tags.length > 0) fd.append('tags', formData.tags.join(','));
+
+      // Simulate progress while uploading
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
+
+      await uploadNote(fd);
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      navigate('/dashboard', { state: { uploadSuccess: true } });
+    } catch (err) {
+      setApiError(err.message || 'Upload failed');
+      setIsUploading(false);
+      setUploadProgress(0);
     }
-    
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    navigate('/dashboard', { state: { uploadSuccess: true } });
   };
 
   return (
@@ -127,15 +160,14 @@ export function UploadPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-display font-bold text-foreground mb-2">Upload Notes</h1>
-        <p className="text-muted">Share your study materials with the community</p>
+        <p className="text-muted">Share study materials with students</p>
       </div>
 
       {/* Progress steps */}
       <div className="flex items-center mb-8">
         <div className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-            step >= 1 ? 'bg-primary text-white' : 'bg-border text-muted'
-          }`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 1 ? 'bg-primary text-white' : 'bg-border text-muted'
+            }`}>
             {step > 1 ? (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -146,9 +178,8 @@ export function UploadPage() {
         </div>
         <div className={`flex-1 h-0.5 mx-4 ${step >= 2 ? 'bg-primary' : 'bg-border'}`}></div>
         <div className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-            step >= 2 ? 'bg-primary text-white' : 'bg-border text-muted'
-          }`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 2 ? 'bg-primary text-white' : 'bg-border text-muted'
+            }`}>
             2
           </div>
           <span className="ml-2 text-sm font-medium text-foreground">Classification</span>
@@ -167,10 +198,10 @@ export function UploadPage() {
               {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
             </h2>
             <p className="text-muted mb-6">Please wait while we process your file</p>
-            
+
             <div className="max-w-xs mx-auto">
               <div className="h-2 bg-border rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-primary transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
@@ -255,6 +286,12 @@ export function UploadPage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {apiError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {apiError}
+              </div>
+            )}
+
             <div className="grid sm:grid-cols-2 gap-4">
               <Select
                 label="College"
@@ -277,47 +314,35 @@ export function UploadPage() {
                 disabled={!formData.collegeId}
                 options={[
                   { value: '', label: formData.collegeId ? 'Select program' : 'Select college first' },
-                  ...availablePrograms.map(p => ({ value: p.id, label: p.name }))
+                  ...programs.map(p => ({ value: p.id, label: p.name }))
                 ]}
               />
             </div>
 
-            <Select
-              label="Subject"
-              name="subjectId"
-              value={formData.subjectId}
-              onChange={handleChange}
-              error={errors.subjectId}
-              disabled={!formData.programId}
-              options={[
-                { value: '', label: formData.programId ? 'Select subject' : 'Select program first' },
-                ...availableSubjects.map(s => ({ value: s.id, label: `${s.code} - ${s.name}` }))
-              ]}
-            />
-
             <div className="grid sm:grid-cols-2 gap-4">
               <Select
-                label="Year"
-                name="yearId"
-                value={formData.yearId}
+                label="Semester"
+                name="semester"
+                value={formData.semester}
                 onChange={handleChange}
-                error={errors.yearId}
+                error={errors.semester}
+                disabled={!formData.programId}
                 options={[
-                  { value: '', label: 'Select year' },
-                  ...years.map(y => ({ value: y.id, label: y.name }))
+                  { value: '', label: formData.programId ? 'Select semester' : 'Select program first' },
+                  ...Array.from({ length: 8 }, (_, i) => ({ value: String(i + 1), label: `Semester ${i + 1}` })),
                 ]}
               />
 
               <Select
-                label="Semester"
-                name="semesterId"
-                value={formData.semesterId}
+                label="Subject"
+                name="subjectId"
+                value={formData.subjectId}
                 onChange={handleChange}
-                error={errors.semesterId}
-                disabled={!formData.yearId}
+                error={errors.subjectId}
+                disabled={!formData.semester}
                 options={[
-                  { value: '', label: formData.yearId ? 'Select semester' : 'Select year first' },
-                  ...availableSemesters.map(s => ({ value: s.id, label: s.name }))
+                  { value: '', label: formData.semester ? (subjects.length ? 'Select subject' : 'No subjects found') : 'Select semester first' },
+                  ...subjects.map(s => ({ value: s.id, label: `${s.code} - ${s.name}` }))
                 ]}
               />
             </div>
@@ -358,13 +383,13 @@ export function UploadPage() {
               <svg className="w-5 h-5 text-success flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Use descriptive titles and accurate classifications
+              Select the correct college, program, semester and subject
             </li>
             <li className="flex items-start gap-2">
               <svg className="w-5 h-5 text-success flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Notes will be reviewed before publishing
+              Use descriptive titles and tags for discoverability
             </li>
           </ul>
         </Card>

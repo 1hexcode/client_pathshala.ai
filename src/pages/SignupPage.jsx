@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Input, Select } from '../components/common';
-import { colleges, getProgramsByCollege } from '../data/academics';
+import { useAuth } from '../contexts/AuthContext';
+import { fetchColleges, fetchPrograms } from '../utils/api';
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const { register } = useAuth();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -16,15 +18,33 @@ export function SignupPage() {
     currentSemester: '',
   });
   const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const programs = formData.collegeId ? getProgramsByCollege(formData.collegeId) : [];
+  // Fetch colleges and programs from API
+  const [colleges, setColleges] = useState([]);
+  const [programs, setPrograms] = useState([]);
+
+  useEffect(() => {
+    fetchColleges()
+      .then(setColleges)
+      .catch(() => setColleges([]));
+  }, []);
+
+  useEffect(() => {
+    if (formData.collegeId) {
+      fetchPrograms(formData.collegeId)
+        .then(setPrograms)
+        .catch(() => setPrograms([]));
+    } else {
+      setPrograms([]);
+    }
+  }, [formData.collegeId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
-      // Reset program when college changes
       if (name === 'collegeId') {
         updated.programId = '';
       }
@@ -33,6 +53,7 @@ export function SignupPage() {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    setApiError('');
   };
 
   const validateStep1 = () => {
@@ -81,14 +102,26 @@ export function SignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateStep2()) return;
-    
+
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsLoading(false);
-    
-    // Navigate to dashboard on success
-    navigate('/dashboard');
+    setApiError('');
+
+    try {
+      await register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: 'student',
+        college_id: formData.collegeId || null,
+        program_id: formData.programId || null,
+        semester: formData.currentSemester ? parseInt(formData.currentSemester) : null,
+      });
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      setApiError(err.message || 'Registration failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -117,6 +150,12 @@ export function SignupPage() {
         <div className={`flex-1 h-1 rounded-full ${step >= 1 ? 'bg-primary' : 'bg-border'}`}></div>
         <div className={`flex-1 h-1 rounded-full ${step >= 2 ? 'bg-primary' : 'bg-border'}`}></div>
       </div>
+
+      {apiError && (
+        <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          {apiError}
+        </div>
+      )}
 
       <form onSubmit={step === 2 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
         {step === 1 ? (
