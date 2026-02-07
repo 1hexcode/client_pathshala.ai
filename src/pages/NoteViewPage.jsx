@@ -80,11 +80,9 @@ export function NoteViewPage() {
         fetchNote(noteId)
             .then((data) => {
                 setNote(data);
-                // Check if file actually exists on disk
+                // Supabase public URLs are always accessible
                 if (data.file_url) {
-                    fetch(`${API_BASE}${data.file_url}`, { method: 'HEAD' })
-                        .then((res) => setFileExists(res.ok))
-                        .catch(() => setFileExists(false));
+                    setFileExists(true);
                 }
             })
             .catch((err) => setError(err.message))
@@ -111,7 +109,8 @@ export function NoteViewPage() {
         );
     }
 
-    const fileUrl = note.file_url ? `${API_BASE}${note.file_url}` : null;
+    // file_url is now a full Supabase public URL
+    const fileUrl = note.file_url || null;
     const isPdf = note.file_url?.toLowerCase().endsWith('.pdf');
 
     return (
