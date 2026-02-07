@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { MainLayout, AuthLayout, ChatLayout } from '../layouts';
+import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import {
   HomePage,
   LoginPage,
@@ -7,6 +8,7 @@ import {
   SummaryPage,
   DashboardPage,
   NotesPage,
+  NoteViewPage,
   UploadPage,
   AdminPage,
   AboutPage,
@@ -25,19 +27,35 @@ export const router = createBrowserRouter([
       },
       {
         path: 'dashboard',
-        element: <DashboardPage />,
+        element: (
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'notes',
         element: <NotesPage />,
       },
       {
+        path: 'notes/:noteId',
+        element: <NoteViewPage />,
+      },
+      {
         path: 'upload',
-        element: <UploadPage />,
+        element: (
+          <ProtectedRoute>
+            <UploadPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'admin',
-        element: <AdminPage />,
+        element: (
+          <ProtectedRoute roles={['admin', 'super_admin']}>
+            <AdminPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'about',

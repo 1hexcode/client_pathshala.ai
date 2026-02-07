@@ -4,6 +4,7 @@ export { SignupPage } from './SignupPage';
 export { SummaryPage } from './ChatPage';
 export { DashboardPage } from './DashboardPage';
 export { NotesPage } from './NotesPage';
+export { NoteViewPage } from './NoteViewPage';
 export { UploadPage } from './UploadPage';
 export { AdminPage } from './AdminPage';
 export { AboutPage } from './AboutPage';
