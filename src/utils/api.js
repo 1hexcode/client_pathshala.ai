@@ -3,7 +3,8 @@
  * Centralized HTTP client for backend communication
  */
 
-const API_BASE = `${import.meta.env.VITE_API_URL}/api/v1`;
+const API_URL = import.meta.env.VITE_API_URL || 'https://likely-jolee-pathsalaai-8856d037.koyeb.app';
+const API_BASE = `${API_URL}/api/v1`;
 
 /**
  * Make an authenticated API request
