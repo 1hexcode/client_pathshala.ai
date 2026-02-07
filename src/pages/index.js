@@ -1,0 +1,11 @@
+export { HomePage } from './HomePage';
+export { LoginPage } from './LoginPage';
+export { SignupPage } from './SignupPage';
+export { SummaryPage } from './ChatPage';
+export { DashboardPage } from './DashboardPage';
+export { NotesPage } from './NotesPage';
+export { UploadPage } from './UploadPage';
+export { AdminPage } from './AdminPage';
+export { AboutPage } from './AboutPage';
+export { ContactPage } from './ContactPage';
+export { NotFoundPage } from './NotFoundPage';
