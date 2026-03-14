@@ -16,7 +16,14 @@ import {
   createSubject,
   deleteSubject,
   fetchNotes,
+  fetchPendingNotes,
+  publishNote,
+  rejectNote,
   deleteNote,
+  fetchLLMModels,
+  createLLMModel,
+  toggleLLMModel,
+  deleteLLMModel,
 } from '../utils/api';
 
 export function AdminPage() {
@@ -29,6 +36,7 @@ export function AdminPage() {
     { id: 'programs', label: 'Programs' },
     { id: 'subjects', label: 'Subjects' },
     ...(isSuperAdmin ? [{ id: 'notes', label: 'Notes' }] : []),
+    ...(isSuperAdmin ? [{ id: 'models', label: 'AI Models' }] : []),
   ];
 
   return (
@@ -41,10 +49,11 @@ export function AdminPage() {
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} variant="pills" className="mb-6" />
 
       {activeTab === 'admins' && isSuperAdmin && <AdminsTab />}
-      {activeTab === 'colleges' && <CollegesTab />}
-      {activeTab === 'programs' && <ProgramsTab />}
-      {activeTab === 'subjects' && <SubjectsTab />}
+      {activeTab === 'colleges' && <CollegesTab isSuperAdmin={isSuperAdmin} />}
+      {activeTab === 'programs' && <ProgramsTab isSuperAdmin={isSuperAdmin} />}
+      {activeTab === 'subjects' && <SubjectsTab isSuperAdmin={isSuperAdmin} />}
       {activeTab === 'notes' && isSuperAdmin && <NotesTab />}
+      {activeTab === 'models' && isSuperAdmin && <ModelsTab />}
     </div>
   );
 }
@@ -179,7 +188,7 @@ function AdminsTab() {
 
 // ─── Colleges Tab ───────────────────────────────────────────────────────────
 
-function CollegesTab() {
+function CollegesTab({ isSuperAdmin }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -266,7 +275,7 @@ function CollegesTab() {
                   </td>
                   <td className="p-4 text-muted text-sm max-w-xs truncate">{c.description || '—'}</td>
                   <td className="p-4">
-                    <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(c.id, c.name)}>Delete</Button>
+                    {isSuperAdmin && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(c.id, c.name)}>Delete</Button>}
                   </td>
                 </tr>
               ))}
@@ -298,7 +307,7 @@ function CollegesTab() {
 
 // ─── Programs Tab ───────────────────────────────────────────────────────────
 
-function ProgramsTab() {
+function ProgramsTab({ isSuperAdmin }) {
   const [items, setItems] = useState([]);
   const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -380,7 +389,7 @@ function ProgramsTab() {
                   <td className="p-4 text-muted">{collegeMap[p.college_id]?.short_name || '—'}</td>
                   <td className="p-4 text-muted">{p.duration} yrs</td>
                   <td className="p-4">
-                    <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(p.id, p.name)}>Delete</Button>
+                    {isSuperAdmin && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(p.id, p.name)}>Delete</Button>}
                   </td>
                 </tr>
               ))}
@@ -420,7 +429,7 @@ function ProgramsTab() {
 
 // ─── Subjects Tab ───────────────────────────────────────────────────────────
 
-function SubjectsTab() {
+function SubjectsTab({ isSuperAdmin }) {
   const [items, setItems] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -507,7 +516,7 @@ function SubjectsTab() {
                   <td className="p-4 text-muted">Sem {s.semester}</td>
                   <td className="p-4 text-muted">{s.credits}</td>
                   <td className="p-4">
-                    <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(s.id, s.code)}>Delete</Button>
+                    {isSuperAdmin && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(s.id, s.code)}>Delete</Button>}
                   </td>
                 </tr>
               ))}
@@ -564,16 +573,19 @@ function formatFileSize(bytes) {
 }
 
 function NotesTab() {
-  const [notes, setNotes] = useState([]);
+  const [allNotes, setAllNotes] = useState([]);
+  const [pendingNotes, setPendingNotes] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('pending'); // pending | published | all
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [n, s] = await Promise.all([fetchNotes(), fetchSubjects()]);
-      setNotes(n);
+      const [n, p, s] = await Promise.all([fetchNotes(), fetchPendingNotes(), fetchSubjects()]);
+      setAllNotes(n);
+      setPendingNotes(p);
       setSubjects(s);
     } catch { /* empty */ }
     setLoading(false);
@@ -581,26 +593,53 @@ function NotesTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handlePublish = async (id, title) => {
+    if (!confirm(`Publish note "${title}"? It will become visible to everyone.`)) return;
+    try { await publishNote(id); load(); }
+    catch (err) { alert(err.message); }
+  };
+
+  const handleReject = async (id, title) => {
+    if (!confirm(`Reject note "${title}"?`)) return;
+    try { await rejectNote(id); load(); }
+    catch (err) { alert(err.message); }
+  };
+
   const handleDelete = async (id, title) => {
-    if (!confirm(`Delete note "${title}"? This will also remove the file from disk.`)) return;
-    try {
-      await deleteNote(id);
-      load();
-    } catch (err) {
-      alert(err.message);
-    }
+    if (!confirm(`Delete note "${title}"? This will also remove the file from storage.`)) return;
+    try { await deleteNote(id); load(); }
+    catch (err) { alert(err.message); }
   };
 
   const subjectMap = Object.fromEntries(subjects.map(s => [s.id, s]));
-  const filtered = notes.filter(n =>
+
+  const displayNotes = filter === 'pending'
+    ? pendingNotes
+    : filter === 'published'
+      ? allNotes
+      : [...pendingNotes, ...allNotes];
+
+  const filtered = displayNotes.filter(n =>
     n.title.toLowerCase().includes(search.toLowerCase())
   );
+
+  const statusVariant = (s) => {
+    if (s === 'ready') return 'success';
+    if (s === 'pending') return 'warning';
+    return 'error';
+  };
+
+  const filterTabs = [
+    { id: 'pending', label: `Pending (${pendingNotes.length})` },
+    { id: 'published', label: `Published (${allNotes.length})` },
+    { id: 'all', label: 'All' },
+  ];
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <SearchInput
           placeholder="Search notes..."
           value={search}
@@ -608,7 +647,7 @@ function NotesTab() {
           onClear={() => setSearch('')}
           className="max-w-xs"
         />
-        <p className="text-muted text-sm">{notes.length} note(s) total</p>
+        <Tabs tabs={filterTabs} activeTab={filter} onChange={setFilter} variant="pills" />
       </div>
 
       <Card>
@@ -637,7 +676,7 @@ function NotesTab() {
                   <td className="p-4 text-muted text-sm">{formatFileSize(n.file_size)}</td>
                   <td className="p-4 text-muted text-sm">{n.views}</td>
                   <td className="p-4">
-                    <Badge variant={n.status === 'ready' ? 'success' : 'warning'}>
+                    <Badge variant={statusVariant(n.status)}>
                       {n.status}
                     </Badge>
                   </td>
@@ -652,8 +691,27 @@ function NotesTab() {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          <Button variant="ghost" size="sm">View File</Button>
+                          <Button variant="ghost" size="sm">View</Button>
                         </a>
+                      )}
+                      {n.status === 'pending' && (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handlePublish(n.id, n.title)}
+                          >
+                            Publish
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-error"
+                            onClick={() => handleReject(n.id, n.title)}
+                          >
+                            Reject
+                          </Button>
+                        </>
                       )}
                       <Button
                         variant="ghost"
@@ -670,7 +728,7 @@ function NotesTab() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-muted">
-                    {notes.length === 0 ? 'No notes uploaded yet' : 'No notes match your search'}
+                    {filter === 'pending' ? 'No pending notes to review' : 'No notes found'}
                   </td>
                 </tr>
               )}
@@ -678,6 +736,148 @@ function NotesTab() {
           </table>
         </div>
       </Card>
+    </div>
+  );
+}
+
+
+// ─── AI Models Tab (Super Admin Only) ───────────────────────────────────────
+
+function ModelsTab() {
+  const [models, setModels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ platform: 'groq', model_id: '', display_name: '', api_key: '', priority: '0' });
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setModels(await fetchLLMModels()); } catch { /* empty */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      await createLLMModel({
+        ...form,
+        priority: parseInt(form.priority) || 0,
+      });
+      setShowModal(false);
+      setForm({ platform: 'groq', model_id: '', display_name: '', api_key: '', priority: '0' });
+      load();
+    } catch (err) { setError(err.message); }
+    setSubmitting(false);
+  };
+
+  const handleToggle = async (id) => {
+    try { await toggleLLMModel(id); load(); }
+    catch (err) { alert(err.message); }
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!confirm(`Delete model "${name}"?`)) return;
+    try { await deleteLLMModel(id); load(); }
+    catch (err) { alert(err.message); }
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-muted">{models.length} model(s) configured</p>
+        <Button variant="primary" onClick={() => setShowModal(true)}>
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Model
+        </Button>
+      </div>
+
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left p-4 font-medium text-muted">Name</th>
+                <th className="text-left p-4 font-medium text-muted">Platform</th>
+                <th className="text-left p-4 font-medium text-muted">Model ID</th>
+                <th className="text-left p-4 font-medium text-muted">Priority</th>
+                <th className="text-left p-4 font-medium text-muted">Status</th>
+                <th className="text-left p-4 font-medium text-muted">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.map((m) => (
+                <tr key={m.id} className="border-b border-border hover:bg-hover">
+                  <td className="p-4 font-medium text-foreground">{m.display_name}</td>
+                  <td className="p-4">
+                    <Badge variant={m.platform === 'groq' ? 'success' : 'neutral'}>
+                      {m.platform}
+                    </Badge>
+                  </td>
+                  <td className="p-4 font-mono text-sm text-muted">{m.model_id}</td>
+                  <td className="p-4 text-muted">{m.priority}</td>
+                  <td className="p-4">
+                    <Badge variant={m.is_enabled ? 'success' : 'error'}>
+                      {m.is_enabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex gap-2">
+                      <Button
+                        variant={m.is_enabled ? 'ghost' : 'primary'}
+                        size="sm"
+                        onClick={() => handleToggle(m.id)}
+                      >
+                        {m.is_enabled ? 'Disable' : 'Enable'}
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(m.id, m.display_name)}>Delete</Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {models.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-muted">
+                    No AI models configured. Add one to enable chat features.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add AI Model">
+        <form onSubmit={handleCreate} className="space-y-4">
+          {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
+          <Select
+            label="Platform"
+            value={form.platform}
+            onChange={(e) => setForm({ ...form, platform: e.target.value })}
+            options={[
+              { value: 'groq', label: 'Groq' },
+              { value: 'openrouter', label: 'OpenRouter' },
+            ]}
+            required
+          />
+          <Input label="Model ID" value={form.model_id} onChange={(e) => setForm({ ...form, model_id: e.target.value })} placeholder="e.g. llama-3.1-8b-instant" required />
+          <Input label="Display Name" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} placeholder="e.g. Llama 3.1 8B (Groq)" required />
+          <Input label="API Key" type="password" value={form.api_key} onChange={(e) => setForm({ ...form, api_key: e.target.value })} placeholder="sk-..." required />
+          <Input label="Priority" type="number" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} placeholder="0 = highest" />
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" className="flex-1" loading={submitting}>Add Model</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
