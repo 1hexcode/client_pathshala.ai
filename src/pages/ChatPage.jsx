@@ -33,7 +33,6 @@ export function SummaryPage() {
   const [processingStep, setProcessingStep] = useState(0);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [platform, setPlatform] = useState('groq');
   const [dragActive, setDragActive] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef(null);
@@ -91,7 +90,7 @@ export function SummaryPage() {
       setProcessingStep(2); // Processing
 
       const response = await fetch(
-        `${API_BASE}/api/v1/pdf/summarize?platform=${platform}`,
+        `${API_BASE}/api/v1/pdf/summarize`,
         {
           method: 'POST',
           body: formData,
@@ -109,8 +108,6 @@ export function SummaryPage() {
 
       setResult({
         summary: data.data.summary,
-        model: data.data.model,
-        platform: data.data.platform,
         filename: data.data.filename,
         textLength: data.data.original_text_length,
         wordCount: data.data.word_count,
@@ -165,7 +162,7 @@ export function SummaryPage() {
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4 shadow-lg shadow-primary/25">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg" style={{ background: 'var(--color-primary)', boxShadow: '0 10px 15px -3px var(--color-primary)40' }}>
             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -174,37 +171,19 @@ export function SummaryPage() {
             PDF Summarizer
           </h1>
           <p className="text-muted max-w-xl mx-auto">
-            Upload a PDF and get an AI-powered summary instantly. Choose between Groq and OpenRouter platforms.
+            Upload an English-written PDF notes file to get an AI-powered summary instantly.
           </p>
+          <div className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs font-medium">
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Only English-language PDF notes are supported
+          </div>
         </div>
 
         {!result ? (
           <>
-            {/* Platform Selector */}
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <span className="text-sm text-muted">Platform:</span>
-              <div className="inline-flex rounded-xl bg-surface border border-border p-1">
-                {[
-                  { id: 'groq', label: 'Groq', icon: '⚡' },
-                  { id: 'openrouter', label: 'OpenRouter', icon: '🔀' },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setPlatform(p.id)}
-                    className={`
-                      px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
-                      ${platform === p.id
-                        ? 'bg-primary text-black shadow-md shadow-primary/25'
-                        : 'text-muted hover:text-foreground hover:bg-surface-hover'
-                      }
-                    `}
-                  >
-                    <span className="mr-1.5">{p.icon}</span>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+
 
             {/* Upload Area */}
             <div
@@ -243,13 +222,23 @@ export function SummaryPage() {
                   <p className="text-muted mb-4">
                     or click to browse files
                   </p>
-                  <div className="flex items-center justify-center gap-4 text-sm text-muted">
-                    <span className="flex items-center gap-1.5">
-                      <svg className="w-4 h-4 text-error" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                      </svg>
-                      PDF files only
-                    </span>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center justify-center gap-4 text-sm text-muted">
+                      <span className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-error" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                        </svg>
+                        PDF files only
+                      </span>
+                      <span className="w-1 h-1 bg-muted/40 rounded-full"></span>
+                      <span className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                        </svg>
+                        English language only
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted/70">Notes &amp; study materials work best</p>
                   </div>
                 </div>
               ) : (
@@ -361,29 +350,38 @@ export function SummaryPage() {
                 {[
                   {
                     icon: (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    ),
-                    title: 'Powered by AI',
-                    desc: 'Uses Groq or OpenRouter to generate intelligent summaries',
-                  },
-                  {
-                    icon: (
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     ),
-                    title: 'PDF Support',
-                    desc: 'Upload any PDF document for text extraction and summarization',
+                    title: 'PDF Notes Only',
+                    desc: 'Only PDF files are accepted — images, Word docs, and other formats are not supported',
+                    highlight: false,
                   },
                   {
                     icon: (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
                     ),
-                    title: 'Multi-Platform',
-                    desc: 'Choose between Groq and OpenRouter for the best results',
+                    title: 'English Only',
+                    desc: 'The PDF must be written in English — other languages may produce inaccurate results',
+                    highlight: true,
+                  },
+                  {
+                    icon: (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    ),
+                    title: 'AI-Powered Summary',
+                    desc: 'Uses advanced AI to generate intelligent, concise summaries of your notes',
+                    highlight: false,
                   },
                 ].map((tip, index) => (
-                  <div key={index} className="p-4 bg-surface rounded-xl border border-border">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
-                      <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div key={index} className={`p-4 rounded-xl border ${
+                    tip.highlight
+                      ? 'bg-amber-500/5 border-amber-500/20'
+                      : 'bg-surface border-border'
+                  }`}>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${
+                      tip.highlight ? 'bg-amber-500/10' : 'bg-primary/10'
+                    }`}>
+                      <svg className={`w-5 h-5 ${tip.highlight ? 'text-amber-500' : 'text-primary'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         {tip.icon}
                       </svg>
                     </div>
@@ -410,7 +408,7 @@ export function SummaryPage() {
                   <div className="flex items-center gap-3 text-sm text-muted">
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 bg-primary rounded-full"></span>
-                      {result.platform} • {result.model}
+                      AI Summary
                     </span>
                     <span>•</span>
                     <span>{result.wordCount.toLocaleString()} words extracted</span>
