@@ -7,8 +7,8 @@ import { useState, useRef, useCallback } from 'react';
 import { Badge } from '../common';
 
 const FileUpload = ({
-  accept = '.pdf,.png,.jpg,.jpeg',
-  maxSize = 10 * 1024 * 1024, // 10MB
+  accept = '.pdf',
+  maxSize = 50 * 1024 * 1024, // 50MB
   onFileSelect,
   className = ''
 }) => {
@@ -54,9 +54,9 @@ const FileUpload = ({
     setError(null);
 
     // Check file type
-    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+    const allowedTypes = ['application/pdf'];
     if (!allowedTypes.includes(selectedFile.type)) {
-      setError('Please upload a PDF or image file (PNG, JPG)');
+      setError('Please upload a PDF file only.');
       return;
     }
 
@@ -67,17 +67,7 @@ const FileUpload = ({
     }
 
     setFile(selectedFile);
-
-    // Generate preview for images
-    if (selectedFile.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-      };
-      reader.readAsDataURL(selectedFile);
-    } else {
-      setPreview(null);
-    }
+    setPreview(null);
 
     // Simulate upload
     simulateUpload(selectedFile);
@@ -204,9 +194,7 @@ const FileUpload = ({
           </p>
 
           <div className="flex items-center justify-center gap-2">
-            <Badge variant="info" size="sm">PDF</Badge>
-            <Badge variant="info" size="sm">PNG</Badge>
-            <Badge variant="info" size="sm">JPG</Badge>
+            <Badge variant="info" size="sm">PDF only</Badge>
           </div>
 
           <p className="text-xs text-[var(--color-text-muted)] mt-4">
