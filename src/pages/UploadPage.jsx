@@ -20,6 +20,7 @@ export function UploadPage() {
     semester: '',
     subjectId: '',
     tags: [],
+    isHandwritten: false,
   });
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState({});
@@ -135,6 +136,7 @@ export function UploadPage() {
       fd.append('subject_id', formData.subjectId);
       if (formData.description) fd.append('description', formData.description);
       if (formData.tags.length > 0) fd.append('tags', formData.tags.join(','));
+      if (formData.isHandwritten) fd.append('is_handwritten', 'true');
 
       // Simulate progress while uploading
       const progressInterval = setInterval(() => {
@@ -147,7 +149,7 @@ export function UploadPage() {
       setUploadProgress(100);
 
       await new Promise(resolve => setTimeout(resolve, 500));
-      navigate('/dashboard', { state: { uploadSuccess: true } });
+      navigate('/dashboard', { state: { uploadPending: true } });
     } catch (err) {
       setApiError(err.message || 'Upload failed');
       setIsUploading(false);
@@ -195,7 +197,7 @@ export function UploadPage() {
               </svg>
             </div>
             <h2 className="text-xl font-display font-semibold text-foreground mb-2">
-              {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
+              {uploadProgress < 100 ? (formData.isHandwritten ? 'Processing OCR...' : 'Uploading...') : 'Processing...'}
             </h2>
             <p className="text-muted mb-6">Please wait while we process your file</p>
 
@@ -224,6 +226,7 @@ export function UploadPage() {
               value={formData.title}
               onChange={handleChange}
               error={errors.title}
+              required
             />
 
             <div>
@@ -299,6 +302,7 @@ export function UploadPage() {
                 value={formData.collegeId}
                 onChange={handleChange}
                 error={errors.collegeId}
+                required
                 options={[
                   { value: '', label: 'Select college' },
                   ...colleges.map(c => ({ value: c.id, label: c.name }))
@@ -312,6 +316,7 @@ export function UploadPage() {
                 onChange={handleChange}
                 error={errors.programId}
                 disabled={!formData.collegeId}
+                required
                 options={[
                   { value: '', label: formData.collegeId ? 'Select program' : 'Select college first' },
                   ...programs.map(p => ({ value: p.id, label: p.name }))
@@ -327,6 +332,7 @@ export function UploadPage() {
                 onChange={handleChange}
                 error={errors.semester}
                 disabled={!formData.programId}
+                required
                 options={[
                   { value: '', label: formData.programId ? 'Select semester' : 'Select program first' },
                   ...Array.from({ length: 8 }, (_, i) => ({ value: String(i + 1), label: `Semester ${i + 1}` })),
@@ -340,6 +346,7 @@ export function UploadPage() {
                 onChange={handleChange}
                 error={errors.subjectId}
                 disabled={!formData.semester}
+                required
                 options={[
                   { value: '', label: formData.semester ? (subjects.length ? 'Select subject' : 'No subjects found') : 'Select semester first' },
                   ...subjects.map(s => ({ value: s.id, label: `${s.code} - ${s.name}` }))
@@ -377,7 +384,7 @@ export function UploadPage() {
               <svg className="w-5 h-5 text-success flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Supported formats: PDF, DOC, DOCX, PPT, PPTX (max 50MB)
+              Supported format: PDF only (max 50MB)
             </li>
             <li className="flex items-start gap-2">
               <svg className="w-5 h-5 text-success flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

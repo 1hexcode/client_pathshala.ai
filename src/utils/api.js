@@ -165,7 +165,23 @@ export async function deleteNote(id) {
     return request(`/notes/${id}`, { method: 'DELETE' });
 }
 
+export async function fetchPendingNotes() {
+    return request('/notes/pending');
+}
+
+export async function publishNote(id) {
+    return request(`/notes/${id}/publish`, { method: 'PATCH' });
+}
+
+export async function rejectNote(id) {
+    return request(`/notes/${id}/reject`, { method: 'PATCH' });
+}
+
 // ─── Stats ───────────────────────────────────────────────────────────────────
+
+export async function fetchDashboard() {
+    return request('/users/me/dashboard');
+}
 
 export async function fetchStats() {
     return request('/stats/');
@@ -177,11 +193,70 @@ export async function fetchNote(noteId) {
     return request(`/notes/${noteId}`);
 }
 
+export async function trackDownload(noteId) {
+    return request(`/notes/${noteId}/download`, { method: 'POST' });
+}
+
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
 export async function chatAboutNote(noteId, message) {
     return request(`/chat/note/${noteId}`, {
         method: 'POST',
         body: JSON.stringify({ message }),
+    });
+}
+
+// ─── OCR ─────────────────────────────────────────────────────────────────────
+
+export async function ocrExtract(imageFile) {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', imageFile);
+
+    const response = await fetch(`${API_BASE}/ocr/extract`, {
+        method: 'POST',
+        headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'OCR failed' }));
+        throw new Error(error.detail || `OCR failed (${response.status})`);
+    }
+
+    return response.json();
+}
+
+// ─── LLM Models ──────────────────────────────────────────────────────────────
+
+export async function fetchLLMModels() {
+    return request('/admin/llm-models');
+}
+
+export async function createLLMModel(data) {
+    return request('/admin/llm-models', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateLLMModel(id, data) {
+    return request(`/admin/llm-models/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function toggleLLMModel(id) {
+    return request(`/admin/llm-models/${id}/toggle`, {
+        method: 'PATCH',
+    });
+}
+
+export async function deleteLLMModel(id) {
+    return request(`/admin/llm-models/${id}`, {
+        method: 'DELETE',
     });
 }

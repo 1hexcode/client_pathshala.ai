@@ -79,18 +79,8 @@ export function SignupPage() {
   };
 
   const validateStep2 = () => {
-    const newErrors = {};
-    if (!formData.collegeId) {
-      newErrors.collegeId = 'Please select your college';
-    }
-    if (!formData.programId) {
-      newErrors.programId = 'Please select your program';
-    }
-    if (!formData.currentSemester) {
-      newErrors.currentSemester = 'Please select your semester';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // College, program, and semester are all optional
+    return true;
   };
 
   const handleNext = () => {

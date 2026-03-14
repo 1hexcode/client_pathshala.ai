@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, Button, Badge, Spinner } from '../components/common';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchNote, chatAboutNote } from '../utils/api';
+import { fetchNote, chatAboutNote, trackDownload } from '../utils/api';
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -74,7 +74,27 @@ export function NoteViewPage() {
     const [error, setError] = useState(null);
     const [fileExists, setFileExists] = useState(false);
 
+    const handleDownload = async () => {
+        if (!fileUrl) return;
+        try {
+            await trackDownload(noteId);
+        } catch {
+            // Non-blocking — proceed with download even if tracking fails
+        }
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = note?.title || 'download';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const hasFetched = useRef(false);
+
     useEffect(() => {
+        if (hasFetched.current) return;
+        hasFetched.current = true;
+
         setLoading(true);
         setError(null);
         fetchNote(noteId)
@@ -146,14 +166,12 @@ export function NoteViewPage() {
                                 )}
                             </div>
                             {fileUrl && (
-                                <a href={fileUrl} download>
-                                    <Button variant="primary" size="sm">
-                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                        Download
-                                    </Button>
-                                </a>
+                                <Button variant="primary" size="sm" onClick={handleDownload}>
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download
+                                </Button>
                             )}
                         </div>
 
@@ -204,9 +222,7 @@ export function NoteViewPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                             <p className="text-muted mb-4">Preview not available for this file type</p>
-                            <a href={fileUrl} download>
-                                <Button variant="primary">Download File</Button>
-                            </a>
+                            <Button variant="primary" onClick={handleDownload}>Download File</Button>
                         </Card>
                     ) : (
                         <Card className="p-12 text-center">
