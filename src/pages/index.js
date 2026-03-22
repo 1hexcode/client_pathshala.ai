@@ -2,6 +2,7 @@ export { HomePage } from './HomePage';
 export { LoginPage } from './LoginPage';
 export { SignupPage } from './SignupPage';
 export { SummaryPage } from './ChatPage';
+export { ProfilePage } from './ProfilePage';
 export { DashboardPage } from './DashboardPage';
 export { NotesPage } from './NotesPage';
 export { NoteViewPage } from './NoteViewPage';
