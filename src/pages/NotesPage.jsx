@@ -140,7 +140,7 @@ export function NotesPage() {
           <SearchInput
             placeholder="Search notes by title, subject, or tags..."
             value={filters.search}
-            onChange={(value) => handleFilterChange('search', value)}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
           />
         </div>
 
@@ -301,7 +301,7 @@ export function NotesPage() {
           }
         />
       ) : viewMode === 'grid' ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
           {filteredNotes.map((note) => (
             <NoteCardSimple key={note.id} note={note} isSuperAdmin={isSuperAdmin} onDelete={handleDelete} />
           ))}
@@ -323,38 +323,51 @@ function NoteCardSimple({ note, isSuperAdmin, onDelete }) {
   const ext = note.file_url ? note.file_url.split('.').pop().toUpperCase() : 'FILE';
 
   return (
-    <Link to={`/notes/${note.id}`}>
-      <Card interactive className="overflow-hidden group">
-        <div className="aspect-[4/3] bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center relative">
-          <svg className="w-16 h-16 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <Badge variant="neutral" className="absolute top-3 left-3 text-xs">{ext}</Badge>
+    <Card className="overflow-hidden flex flex-col h-full">
+      {/* Thumbnail */}
+      <div className="aspect-[4/3] bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center relative flex-shrink-0">
+        <svg className="w-16 h-16 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <Badge variant="neutral" className="absolute top-3 left-3 text-xs">{ext}</Badge>
+      </div>
+
+      {/* Body — flex-1 so all cards stretch to the same height */}
+      <div className="p-4 flex flex-col flex-1">
+        <h3 className="font-semibold text-foreground mb-1 line-clamp-1">{note.title}</h3>
+        <p className="text-sm text-muted mb-3 line-clamp-2 flex-1">{note.description || 'No description'}</p>
+
+        {/* Tags — fixed 1-line area */}
+        <div className="flex items-center gap-1.5 mb-3 min-h-[24px] flex-wrap">
+          {note.tags?.slice(0, 3).map(tag => (
+            <Badge key={tag} variant="neutral" className="text-xs">{tag}</Badge>
+          ))}
         </div>
-        <div className="p-4">
-          <h3 className="font-medium text-foreground mb-1 line-clamp-1">{note.title}</h3>
-          <p className="text-sm text-muted mb-3 line-clamp-2">{note.description || 'No description'}</p>
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            {note.tags?.slice(0, 3).map(tag => (
-              <Badge key={tag} variant="neutral" className="text-xs">{tag}</Badge>
-            ))}
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted">{note.downloads} downloads</span>
-            <div className="flex gap-2">
-              <span className="text-primary hover:text-primary-dark font-medium">
-                View
-              </span>
-              {isSuperAdmin && (
-                <button onClick={(e) => { e.preventDefault(); onDelete(note.id); }} className="text-red-500 hover:text-red-600 font-medium">
-                  Delete
-                </button>
-              )}
-            </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-3 border-t border-border">
+          <span className="text-xs text-muted">{note.downloads} downloads</span>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/notes/${note.id}`}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg text-white transition-colors"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              View
+            </Link>
+            {isSuperAdmin && (
+              <button
+                onClick={(e) => { e.preventDefault(); onDelete(note.id); }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer"
+                style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
-      </Card>
-    </Link>
+      </div>
+    </Card>
   );
 }
 
@@ -362,30 +375,35 @@ function NoteListItem({ note, isSuperAdmin, onDelete }) {
   const ext = note.file_url ? note.file_url.split('.').pop().toUpperCase() : 'FILE';
 
   return (
-    <Card className="p-4 flex gap-4 items-start">
+    <Card className="p-4 flex gap-4 items-center">
       <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
         <span className="text-xs font-bold text-primary">{ext}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="font-medium text-foreground mb-1 line-clamp-1">{note.title}</h3>
-        <p className="text-sm text-muted mb-2 line-clamp-1">{note.description || 'No description'}</p>
-        <div className="flex items-center gap-4 text-sm text-muted">
+        <h3 className="font-semibold text-foreground mb-0.5 line-clamp-1">{note.title}</h3>
+        <p className="text-sm text-muted line-clamp-1">{note.description || 'No description'}</p>
+        <div className="flex items-center gap-3 text-xs text-muted mt-1">
           <span>{note.downloads} downloads</span>
           <span>{note.views} views</span>
           {note.file_size && <span>{formatFileSize(note.file_size)}</span>}
+          {note.tags?.slice(0, 3).map(tag => (
+            <Badge key={tag} variant="neutral" className="text-xs">{tag}</Badge>
+          ))}
         </div>
       </div>
-      <div className="flex gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0">
         <Link
           to={`/notes/${note.id}`}
-          className="px-3 py-1.5 text-sm font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+          className="px-4 py-1.5 text-sm font-semibold rounded-lg text-white transition-colors"
+          style={{ backgroundColor: 'var(--color-primary)' }}
         >
           View
         </Link>
         {isSuperAdmin && (
           <button
             onClick={() => onDelete(note.id)}
-            className="px-3 py-1.5 text-sm font-medium text-red-500 border border-red-500/30 rounded-lg hover:bg-red-500/5 transition-colors"
+            className="px-4 py-1.5 text-sm font-semibold rounded-lg border transition-colors cursor-pointer"
+            style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
           >
             Delete
           </button>
@@ -394,3 +412,4 @@ function NoteListItem({ note, isSuperAdmin, onDelete }) {
     </Card>
   );
 }
+
