@@ -4,7 +4,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { loginUser as apiLogin, registerUser as apiRegister, fetchCurrentUser } from '../utils/api';
+import { loginUser as apiLogin, registerUser as apiRegister, fetchCurrentUser, updateProfile } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -65,6 +65,13 @@ export function AuthProvider({ children }) {
         setUser(null);
     }, []);
 
+    const updateUser = useCallback(async (data) => {
+        const updatedUser = await updateProfile(data);
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        return updatedUser;
+    }, []);
+
     const value = {
         user,
         token,
@@ -75,6 +82,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
+        updateUser,
     };
 
     return (
