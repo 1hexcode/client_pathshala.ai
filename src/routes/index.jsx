@@ -6,6 +6,7 @@ import {
   LoginPage,
   SignupPage,
   SummaryPage,
+  ProfilePage,
   DashboardPage,
   NotesPage,
   NoteViewPage,
@@ -30,6 +31,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'profile',
+        element: (
+          <ProtectedRoute>
+            <ProfilePage />
           </ProtectedRoute>
         ),
       },
