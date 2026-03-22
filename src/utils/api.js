@@ -68,6 +68,23 @@ export async function toggleUserActive(userId) {
     return request(`/users/${userId}/toggle-active`, { method: 'PATCH' });
 }
 
+// ─── Admin: Students ──────────────────────────────────────────────────────────
+
+export async function createStudent(data) {
+    return request('/admin/create-student', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function fetchStudents() {
+    return request('/admin/students');
+}
+
+export async function toggleStudentActive(userId) {
+    return request(`/admin/students/${userId}/toggle-active`, { method: 'PATCH' });
+}
+
 // ─── Admin: Colleges ─────────────────────────────────────────────────────────
 
 export async function fetchColleges() {
@@ -195,6 +212,13 @@ export async function fetchNote(noteId) {
 
 export async function trackDownload(noteId) {
     return request(`/notes/${noteId}/download`, { method: 'POST' });
+}
+
+export async function updateProfile(data) {
+    return request('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
 }
 
 // ─── Chat ────────────────────────────────────────────────────────────────────
