@@ -31,11 +31,11 @@ import {
 
 export function AdminPage() {
   const { isSuperAdmin, user } = useAuth();
-  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'admins' : 'colleges');
+  const [activeTab, setActiveTab] = useState('colleges');
 
   const tabs = [
-    ...(isSuperAdmin ? [{ id: 'admins', label: 'Admins' }] : []),
     { id: 'colleges', label: 'Colleges' },
+    ...(isSuperAdmin ? [{ id: 'admins', label: 'Admins' }] : []),
     { id: 'programs', label: 'Programs' },
     { id: 'subjects', label: 'Subjects' },
     ...(!isSuperAdmin ? [{ id: 'students', label: 'Students' }] : []),
@@ -68,17 +68,20 @@ export function AdminPage() {
 
 function AdminsTab() {
   const [admins, setAdmins] = useState([]);
+  const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'admin' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'admin', college_id: '' });
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchUsers('admin');
+      const [data, cols] = await Promise.all([fetchUsers('admin'), fetchColleges()]);
       setAdmins(data);
+      setColleges(cols);
     } catch { /* empty */ }
     setLoading(false);
   }, []);
@@ -90,9 +93,12 @@ function AdminsTab() {
     setSubmitting(true);
     setError('');
     try {
-      await createAdminUser(form);
+      await createAdminUser({
+        ...form,
+        college_id: form.college_id || undefined,
+      });
       setShowModal(false);
-      setForm({ name: '', email: '', password: '', role: 'admin' });
+      setForm({ name: '', email: '', password: '', role: 'admin', college_id: '' });
       load();
     } catch (err) {
       setError(err.message);
@@ -101,21 +107,30 @@ function AdminsTab() {
   };
 
   const handleToggle = async (userId) => {
+    setActionError('');
     try {
       await toggleUserActive(userId);
       load();
     } catch (err) {
-      alert(err.message);
+      setActionError(err.message);
     }
   };
+
+  // Build a quick college lookup map
+  const collegeMap = Object.fromEntries(colleges.map(c => [c.id, c]));
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
 
   return (
     <div>
+      {actionError && (
+        <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          {actionError}
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <p className="text-muted">{admins.length} admin(s)</p>
-        <Button variant="primary" onClick={() => setShowModal(true)}>
+        <Button variant="primary" onClick={() => { setError(''); setShowModal(true); }}>
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -130,6 +145,7 @@ function AdminsTab() {
               <tr className="border-b border-border">
                 <th className="text-left p-4 font-medium text-muted">Name</th>
                 <th className="text-left p-4 font-medium text-muted">Email</th>
+                <th className="text-left p-4 font-medium text-muted">College</th>
                 <th className="text-left p-4 font-medium text-muted">Status</th>
                 <th className="text-left p-4 font-medium text-muted">Created</th>
                 <th className="text-left p-4 font-medium text-muted">Actions</th>
@@ -140,6 +156,11 @@ function AdminsTab() {
                 <tr key={admin.id} className="border-b border-border hover:bg-hover">
                   <td className="p-4 font-medium text-foreground">{admin.name}</td>
                   <td className="p-4 text-muted">{admin.email}</td>
+                  <td className="p-4 text-muted">
+                    {admin.college_id
+                      ? (collegeMap[admin.college_id]?.short_name || '—')
+                      : <span className="text-xs text-yellow-500">No college</span>}
+                  </td>
                   <td className="p-4">
                     <Badge variant={admin.is_active ? 'success' : 'error'}>
                       {admin.is_active ? 'Active' : 'Disabled'}
@@ -161,7 +182,7 @@ function AdminsTab() {
               ))}
               {admins.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-muted">No admins yet</td>
+                  <td colSpan={6} className="p-8 text-center text-muted">No admins yet</td>
                 </tr>
               )}
             </tbody>
@@ -180,9 +201,24 @@ function AdminsTab() {
           <Input label="Full Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
           <Input label="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+          <Select
+            label="Assign College"
+            value={form.college_id}
+            onChange={(e) => setForm({ ...form, college_id: e.target.value })}
+            options={[
+              { value: '', label: 'Select a college' },
+              ...colleges
+                .filter(c => !admins.some(a => a.college_id === c.id))
+                .map(c => ({ value: c.id, label: `${c.icon ? c.icon + ' ' : ''}${c.name}` }))
+            ]}
+            required
+          />
+          <p className="text-xs text-muted -mt-2">
+            Each admin must be assigned a college.
+          </p>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button type="submit" variant="primary" className="flex-1" loading={submitting}>Create</Button>
+            <Button type="submit" variant="primary" className="flex-1" loading={submitting}>Create Admin</Button>
           </div>
         </form>
       </Modal>
@@ -249,8 +285,8 @@ function CollegesTab({ isSuperAdmin, user }) {
     } catch (err) { setError(err.message); }
   };
 
-  // Regular admins: they already have a college — no need to create another
-  const alreadyHasCollege = !isSuperAdmin && !!user?.college_id;
+  // Admins cannot create colleges — their college is pre-assigned by super admin
+  const alreadyHasCollege = !isSuperAdmin;
 
   const filtered = items.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -271,8 +307,8 @@ function CollegesTab({ isSuperAdmin, user }) {
         )}
       </div>
 
-      {alreadyHasCollege && items.length === 0 && (
-        <div className="p-6 text-center text-muted">Loading your college...</div>
+      {alreadyHasCollege && items.length === 0 && !user?.college_id && (
+        <div className="p-6 text-center text-muted">No college has been assigned to your account yet. Please contact the super admin to get a college assigned.</div>
       )}
 
       <Card>
@@ -310,7 +346,7 @@ function CollegesTab({ isSuperAdmin, user }) {
               {filtered.length === 0 && (
                 <tr><td colSpan={5} className="p-8 text-center text-muted">
                   {!isSuperAdmin && !user?.college_id
-                    ? 'You have not created a college yet. Click "Add College" to get started.'
+                    ? 'No college has been assigned to your account yet. Please contact the super admin to get a college assigned.'
                     : 'No colleges found'}
                 </td></tr>
               )}
@@ -404,8 +440,8 @@ function ProgramsTab({ isSuperAdmin, user }) {
   if (!isSuperAdmin && !adminCollegeId) {
     return (
       <div className="py-12 text-center">
-        <p className="text-muted text-lg mb-2">No college set up yet</p>
-        <p className="text-muted text-sm">Go to the <strong>Colleges</strong> tab and create your college first before adding programs.</p>
+        <p className="text-muted text-lg mb-2">No college assigned yet</p>
+        <p className="text-muted text-sm">Please contact the super admin to get a college assigned to your account before adding programs.</p>
       </div>
     );
   }
@@ -560,8 +596,8 @@ function SubjectsTab({ isSuperAdmin, user }) {
   if (!isSuperAdmin && !adminCollegeId) {
     return (
       <div className="py-12 text-center">
-        <p className="text-muted text-lg mb-2">No college set up yet</p>
-        <p className="text-muted text-sm">Go to the <strong>Colleges</strong> tab and create your college first before adding subjects.</p>
+        <p className="text-muted text-lg mb-2">No college assigned yet</p>
+        <p className="text-muted text-sm">Please contact the super admin to get a college assigned to your account before adding subjects.</p>
       </div>
     );
   }
@@ -1038,6 +1074,15 @@ function StudentsTab({ user }) {
   );
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
+
+  if (!user?.college_id) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-muted text-lg mb-2">No college assigned yet</p>
+        <p className="text-muted text-sm">Please contact the super admin to get a college assigned to your account before managing students.</p>
+      </div>
+    );
+  }
 
   return (
     <div>
