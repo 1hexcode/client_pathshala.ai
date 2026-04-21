@@ -24,7 +24,28 @@ async function request(endpoint, options = {}) {
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({ detail: 'Network error' }));
-        throw new Error(error.detail || `Request failed (${response.status})`);
+        let errorMessage = error.detail;
+        if (Array.isArray(errorMessage)) {
+            // Prettify FastAPI validation errors
+            errorMessage = errorMessage.map(e => {
+                let field = e.loc ? String(e.loc[e.loc.length - 1]) : '';
+                // Convert 'program_id' to 'Program Id'
+                field = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                
+                let msg = e.msg || 'invalid entry';
+                const msgLower = msg.toLowerCase();
+                
+                // Simplify technical type coercion errors to 'is required'
+                if (msgLower === 'field required' || 
+                    msgLower.includes('valid uuid') || 
+                    msgLower.includes('valid integer')) {
+                    msg = 'is required';
+                }
+                
+                return field ? `${field} ${msg}` : msg;
+            }).join(' • ');
+        }
+        throw new Error(errorMessage || `Request failed (${response.status})`);
     }
 
     return response.json();
@@ -85,6 +106,10 @@ export async function toggleStudentActive(userId) {
     return request(`/admin/students/${userId}/toggle-active`, { method: 'PATCH' });
 }
 
+export async function deleteStudent(userId) {
+    return request(`/admin/students/${userId}`, { method: 'DELETE' });
+}
+
 // ─── Admin: Colleges ─────────────────────────────────────────────────────────
 
 export async function fetchColleges() {
@@ -110,6 +135,13 @@ export async function toggleCollegeFavourite(id) {
     return request(`/admin/colleges/${id}/toggle-favourite`, { method: 'PATCH' });
 }
 
+export async function updateCollege(id, data) {
+    return request(`/admin/colleges/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+}
+
 // ─── Admin: Programs ─────────────────────────────────────────────────────────
 
 export async function fetchPrograms(collegeId) {
@@ -126,6 +158,13 @@ export async function createProgram(data) {
 
 export async function deleteProgram(id) {
     return request(`/admin/programs/${id}`, { method: 'DELETE' });
+}
+
+export async function updateProgram(id, data) {
+    return request(`/admin/programs/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
 }
 
 // ─── Admin: Subjects ─────────────────────────────────────────────────────────
@@ -147,6 +186,13 @@ export async function createSubject(data) {
 
 export async function deleteSubject(id) {
     return request(`/admin/subjects/${id}`, { method: 'DELETE' });
+}
+
+export async function updateSubject(id, data) {
+    return request(`/admin/subjects/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
 }
 
 // ─── Notes ───────────────────────────────────────────────────────────────────
