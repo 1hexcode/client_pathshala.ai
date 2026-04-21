@@ -7,13 +7,16 @@ import {
   toggleUserActive,
   fetchColleges,
   createCollege,
+  updateCollege,
   deleteCollege,
   toggleCollegeFavourite,
   fetchPrograms,
   createProgram,
+  updateProgram,
   deleteProgram,
   fetchSubjects,
   createSubject,
+  updateSubject,
   deleteSubject,
   fetchNotes,
   fetchPendingNotes,
@@ -27,6 +30,7 @@ import {
   createStudent,
   fetchStudents,
   toggleStudentActive,
+  deleteStudent,
 } from '../utils/api';
 
 export function AdminPage() {
@@ -39,7 +43,7 @@ export function AdminPage() {
     { id: 'programs', label: 'Programs' },
     { id: 'subjects', label: 'Subjects' },
     ...(!isSuperAdmin ? [{ id: 'students', label: 'Students' }] : []),
-    ...(isSuperAdmin ? [{ id: 'notes', label: 'Notes' }] : []),
+    { id: 'notes', label: 'Notes' },
     ...(isSuperAdmin ? [{ id: 'models', label: 'AI Models' }] : []),
   ];
 
@@ -57,7 +61,7 @@ export function AdminPage() {
       {activeTab === 'programs' && <ProgramsTab isSuperAdmin={isSuperAdmin} user={user} />}
       {activeTab === 'subjects' && <SubjectsTab isSuperAdmin={isSuperAdmin} user={user} />}
       {activeTab === 'students' && !isSuperAdmin && <StudentsTab user={user} />}
-      {activeTab === 'notes' && isSuperAdmin && <NotesTab />}
+      {activeTab === 'notes' && <NotesTab isSuperAdmin={isSuperAdmin} user={user} />}
       {activeTab === 'models' && isSuperAdmin && <ModelsTab />}
     </div>
   );
@@ -207,14 +211,12 @@ function AdminsTab() {
             onChange={(e) => setForm({ ...form, college_id: e.target.value })}
             options={[
               { value: '', label: 'Select a college' },
-              ...colleges
-                .filter(c => !admins.some(a => a.college_id === c.id))
-                .map(c => ({ value: c.id, label: `${c.icon ? c.icon + ' ' : ''}${c.name}` }))
+              ...colleges.map(c => ({ value: c.id, label: `${c.icon ? c.icon + ' ' : ''}${c.name}` }))
             ]}
             required
           />
           <p className="text-xs text-muted -mt-2">
-            Each admin must be assigned a college.
+            Assign this admin to a college.
           </p>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
@@ -237,6 +239,13 @@ function CollegesTab({ isSuperAdmin, user }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+
+  // Edit state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', short_name: '', description: '', icon: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [editError, setEditError] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   // For regular admins, reload their own user to get updated college_id after creation
   const load = useCallback(async () => {
@@ -273,7 +282,7 @@ function CollegesTab({ isSuperAdmin, user }) {
   };
 
   const handleDelete = async (id, name) => {
-    if (!confirm(`Delete college "${name}"?`)) return;
+    if (!confirm(`Delete college "${name}"?\n\nThis will also delete ALL associated programs, subjects, admins, and students.`)) return;
     try { await deleteCollege(id); load(); }
     catch (err) { setError(err.message); }
   };
@@ -283,6 +292,37 @@ function CollegesTab({ isSuperAdmin, user }) {
       await toggleCollegeFavourite(id);
       load();
     } catch (err) { setError(err.message); }
+  };
+
+  const openEdit = (college) => {
+    setEditingId(college.id);
+    setEditForm({
+      name: college.name || '',
+      short_name: college.short_name || '',
+      description: college.description || '',
+      icon: college.icon || '',
+    });
+    setEditError('');
+    setShowEditModal(true);
+  };
+
+  const handleEdit = async (e) => {
+    e.preventDefault();
+    setEditSubmitting(true);
+    setEditError('');
+    try {
+      await updateCollege(editingId, editForm);
+      setShowEditModal(false);
+      setEditingId(null);
+      load();
+    } catch (err) { setEditError(err.message); }
+    setEditSubmitting(false);
+  };
+
+  // Permission check: can this user edit a given college?
+  const canEdit = (college) => {
+    if (isSuperAdmin) return true;
+    return user?.college_id === college.id;
   };
 
   // Admins cannot create colleges — their college is pre-assigned by super admin
@@ -318,7 +358,7 @@ function CollegesTab({ isSuperAdmin, user }) {
               <tr className="border-b border-border">
                 <th className="text-left p-4 font-medium text-muted">Name</th>
                 <th className="text-left p-4 font-medium text-muted">Short Name</th>
-                <th className="text-left p-4 font-medium text-muted">Favourite</th>
+                {isSuperAdmin && <th className="text-left p-4 font-medium text-muted">Favourite</th>}
                 <th className="text-left p-4 font-medium text-muted">Description</th>
                 <th className="text-left p-4 font-medium text-muted">Actions</th>
               </tr>
@@ -328,23 +368,28 @@ function CollegesTab({ isSuperAdmin, user }) {
                 <tr key={c.id} className="border-b border-border hover:bg-hover">
                   <td className="p-4 font-medium text-foreground">{c.icon} {c.name}</td>
                   <td className="p-4 text-muted">{c.short_name}</td>
-                  <td className="p-4">
-                    <button
-                      onClick={() => handleToggleFav(c.id)}
-                      className={`text-xl transition-transform hover:scale-110 ${c.is_favourite ? 'grayscale-0' : 'grayscale opacity-30'}`}
-                      title={c.is_favourite ? 'Remove from favourites' : 'Add to favourites'}
-                    >
-                      ⭐
-                    </button>
-                  </td>
+                  {isSuperAdmin && (
+                    <td className="p-4">
+                      <button
+                        onClick={() => handleToggleFav(c.id)}
+                        className={`text-xl transition-transform hover:scale-110 ${c.is_favourite ? 'grayscale-0' : 'grayscale opacity-30'}`}
+                        title={c.is_favourite ? 'Remove from favourites' : 'Add to favourites'}
+                      >
+                        ⭐
+                      </button>
+                    </td>
+                  )}
                   <td className="p-4 text-muted text-sm max-w-xs truncate">{c.description || '—'}</td>
                   <td className="p-4">
-                    {isSuperAdmin && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(c.id, c.name)}>Delete</Button>}
+                    <div className="flex gap-2">
+                      {canEdit(c) && <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>Edit</Button>}
+                      {isSuperAdmin && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(c.id, c.name)}>Delete</Button>}
+                    </div>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="p-8 text-center text-muted">
+                <tr><td colSpan={isSuperAdmin ? 5 : 4} className="p-8 text-center text-muted">
                   {!isSuperAdmin && !user?.college_id
                     ? 'No college has been assigned to your account yet. Please contact the super admin to get a college assigned.'
                     : 'No colleges found'}
@@ -355,6 +400,7 @@ function CollegesTab({ isSuperAdmin, user }) {
         </div>
       </Card>
 
+      {/* Create College Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add College">
         <form onSubmit={handleCreate} className="space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
@@ -365,6 +411,21 @@ function CollegesTab({ isSuperAdmin, user }) {
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button type="submit" variant="primary" className="flex-1" loading={submitting}>Create</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit College Modal */}
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit College">
+        <form onSubmit={handleEdit} className="space-y-4">
+          {editError && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{editError}</div>}
+          <Input label="College Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="e.g. College of Engineering" required />
+          <Input label="Short Name" value={editForm.short_name} onChange={(e) => setEditForm({ ...editForm, short_name: e.target.value })} placeholder="e.g. COE" required />
+          <Input label="Icon (emoji)" value={editForm.icon} onChange={(e) => setEditForm({ ...editForm, icon: e.target.value })} placeholder="e.g. ⚙️" />
+          <Input label="Description" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Brief description" />
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" className="flex-1" loading={editSubmitting}>Save Changes</Button>
           </div>
         </form>
       </Modal>
@@ -390,6 +451,13 @@ function ProgramsTab({ isSuperAdmin, user }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+
+  // Edit state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', short_name: '', duration: '4', description: '', total_credits: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [editError, setEditError] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -426,9 +494,47 @@ function ProgramsTab({ isSuperAdmin, user }) {
   };
 
   const handleDelete = async (id, name) => {
-    if (!confirm(`Delete program "${name}"?`)) return;
+    if (!confirm(`Delete program "${name}"?\n\nThis will also delete ALL subjects under this program.`)) return;
     try { await deleteProgram(id); load(); }
     catch (err) { setError(err.message); }
+  };
+
+  const openEdit = (program) => {
+    setEditingId(program.id);
+    setEditForm({
+      name: program.name || '',
+      short_name: program.short_name || '',
+      duration: String(program.duration || 4),
+      description: program.description || '',
+      total_credits: program.total_credits != null ? String(program.total_credits) : '',
+    });
+    setEditError('');
+    setShowEditModal(true);
+  };
+
+  const handleEdit = async (e) => {
+    e.preventDefault();
+    setEditSubmitting(true);
+    setEditError('');
+    try {
+      await updateProgram(editingId, {
+        name: editForm.name,
+        short_name: editForm.short_name,
+        duration: parseInt(editForm.duration) || 4,
+        description: editForm.description || null,
+        total_credits: editForm.total_credits ? parseInt(editForm.total_credits) : null,
+      });
+      setShowEditModal(false);
+      setEditingId(null);
+      load();
+    } catch (err) { setEditError(err.message); }
+    setEditSubmitting(false);
+  };
+
+  // Permission check: can this user edit a given program?
+  const canEdit = (program) => {
+    if (isSuperAdmin) return true;
+    return adminCollegeId && program.college_id === adminCollegeId;
   };
 
   const collegeMap = Object.fromEntries(colleges.map(c => [c.id, c]));
@@ -478,7 +584,10 @@ function ProgramsTab({ isSuperAdmin, user }) {
                   {isSuperAdmin && <td className="p-4 text-muted">{collegeMap[p.college_id]?.short_name || '—'}</td>}
                   <td className="p-4 text-muted">{p.duration} yrs</td>
                   <td className="p-4">
-                    {isSuperAdmin && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(p.id, p.name)}>Delete</Button>}
+                    <div className="flex gap-2">
+                      {canEdit(p) && <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>Edit</Button>}
+                      {canEdit(p) && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(p.id, p.name)}>Delete</Button>}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -490,6 +599,7 @@ function ProgramsTab({ isSuperAdmin, user }) {
         </div>
       </Card>
 
+      {/* Create Program Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Program">
         <form onSubmit={handleCreate} className="space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
@@ -512,12 +622,28 @@ function ProgramsTab({ isSuperAdmin, user }) {
           )}
           <Input label="Program Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Computer Engineering" required />
           <Input label="Short Name" value={form.short_name} onChange={(e) => setForm({ ...form, short_name: e.target.value })} placeholder="e.g. BCE" required />
-          <Input label="Duration (years)" type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} />
-          <Input label="Total Credits" type="number" value={form.total_credits} onChange={(e) => setForm({ ...form, total_credits: e.target.value })} />
+          <Input label="Duration (years)" type="number" min="1" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} required />
+          <Input label="Total Credits" type="number" min="1" value={form.total_credits} onChange={(e) => setForm({ ...form, total_credits: e.target.value })} required />
           <Input label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief description" />
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button type="submit" variant="primary" className="flex-1" loading={submitting}>Create</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Program Modal */}
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Program">
+        <form onSubmit={handleEdit} className="space-y-4">
+          {editError && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{editError}</div>}
+          <Input label="Program Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="e.g. Computer Engineering" required />
+          <Input label="Short Name" value={editForm.short_name} onChange={(e) => setEditForm({ ...editForm, short_name: e.target.value })} placeholder="e.g. BCE" required />
+          <Input label="Duration (years)" type="number" min="1" value={editForm.duration} onChange={(e) => setEditForm({ ...editForm, duration: e.target.value })} required />
+          <Input label="Total Credits" type="number" min="1" value={editForm.total_credits} onChange={(e) => setEditForm({ ...editForm, total_credits: e.target.value })} required />
+          <Input label="Description" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Brief description" />
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" className="flex-1" loading={editSubmitting}>Save Changes</Button>
           </div>
         </form>
       </Modal>
@@ -537,6 +663,13 @@ function SubjectsTab({ isSuperAdmin, user }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+
+  // Edit state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', code: '', semester: '', credits: '3', description: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [editError, setEditError] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const adminCollegeId = !isSuperAdmin ? user?.college_id : null;
 
@@ -584,6 +717,47 @@ function SubjectsTab({ isSuperAdmin, user }) {
     catch (err) { setError(err.message); }
   };
 
+  const openEdit = (subject) => {
+    setEditingId(subject.id);
+    setEditForm({
+      name: subject.name || '',
+      code: subject.code || '',
+      semester: String(subject.semester || ''),
+      credits: String(subject.credits || 3),
+      description: subject.description || '',
+      _program_id: subject.program_id, // track for dynamic semesters
+    });
+    setEditError('');
+    setShowEditModal(true);
+  };
+
+  const handleEdit = async (e) => {
+    e.preventDefault();
+    setEditSubmitting(true);
+    setEditError('');
+    try {
+      await updateSubject(editingId, {
+        name: editForm.name,
+        code: editForm.code,
+        semester: parseInt(editForm.semester),
+        credits: parseInt(editForm.credits) || 3,
+        description: editForm.description || null,
+      });
+      setShowEditModal(false);
+      setEditingId(null);
+      load();
+    } catch (err) { setEditError(err.message); }
+    setEditSubmitting(false);
+  };
+
+  // Permission check: can this user edit a given subject?
+  const canEdit = (subject) => {
+    if (isSuperAdmin) return true;
+    // Admin can edit subjects belonging to programs in their college
+    const program = programMap[subject.program_id];
+    return adminCollegeId && program && program.college_id === adminCollegeId;
+  };
+
   const programMap = Object.fromEntries(programs.map(p => [p.id, p]));
   const filtered = items.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -598,6 +772,16 @@ function SubjectsTab({ isSuperAdmin, user }) {
       <div className="py-12 text-center">
         <p className="text-muted text-lg mb-2">No college assigned yet</p>
         <p className="text-muted text-sm">Please contact the super admin to get a college assigned to your account before adding subjects.</p>
+      </div>
+    );
+  }
+
+  // No programs available — show prompt
+  if (programs.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-muted text-lg mb-2">No programs available</p>
+        <p className="text-muted text-sm">Please create a program first before adding subjects.</p>
       </div>
     );
   }
@@ -638,7 +822,10 @@ function SubjectsTab({ isSuperAdmin, user }) {
                   <td className="p-4 text-muted">Sem {s.semester}</td>
                   <td className="p-4 text-muted">{s.credits}</td>
                   <td className="p-4">
-                    {isSuperAdmin && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(s.id, s.code)}>Delete</Button>}
+                    <div className="flex gap-2">
+                      {canEdit(s) && <Button variant="ghost" size="sm" onClick={() => openEdit(s)}>Edit</Button>}
+                      {canEdit(s) && <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(s.id, s.code)}>Delete</Button>}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -650,6 +837,7 @@ function SubjectsTab({ isSuperAdmin, user }) {
         </div>
       </Card>
 
+      {/* Create Subject Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Subject">
         <form onSubmit={handleCreate} className="space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
@@ -666,7 +854,7 @@ function SubjectsTab({ isSuperAdmin, user }) {
             onChange={(e) => setForm({ ...form, semester: e.target.value })}
             options={[
               { value: '', label: 'Select semester' },
-              ...Array.from({ length: 8 }, (_, i) => ({ value: String(i + 1), label: `Semester ${i + 1}` })),
+              ...Array.from({ length: (programMap[form.program_id]?.duration || 4) * 2 }, (_, i) => ({ value: String(i + 1), label: `Semester ${i + 1}` })),
             ]}
             required
           />
@@ -680,12 +868,37 @@ function SubjectsTab({ isSuperAdmin, user }) {
           </div>
         </form>
       </Modal>
+
+      {/* Edit Subject Modal */}
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Subject">
+        <form onSubmit={handleEdit} className="space-y-4">
+          {editError && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{editError}</div>}
+          <Input label="Subject Code" value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} placeholder="e.g. CS201" required />
+          <Input label="Subject Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="e.g. Data Structures" required />
+          <Select
+            label="Semester"
+            value={editForm.semester}
+            onChange={(e) => setEditForm({ ...editForm, semester: e.target.value })}
+            options={[
+              { value: '', label: 'Select semester' },
+              ...Array.from({ length: (programMap[editForm._program_id]?.duration || 4) * 2 }, (_, i) => ({ value: String(i + 1), label: `Semester ${i + 1}` })),
+            ]}
+            required
+          />
+          <Input label="Credits" type="number" value={editForm.credits} onChange={(e) => setEditForm({ ...editForm, credits: e.target.value })} />
+          <Input label="Description" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Brief description" />
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" className="flex-1" loading={editSubmitting}>Save Changes</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
 
 
-// ─── Notes Tab (Super Admin Only) ───────────────────────────────────────────
+// ─── Notes Tab ──────────────────────────────────────────────────────────────
 
 function formatFileSize(bytes) {
   if (!bytes) return '—';
@@ -694,7 +907,7 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function NotesTab() {
+function NotesTab({ isSuperAdmin, user }) {
   const [allNotes, setAllNotes] = useState([]);
   const [pendingNotes, setPendingNotes] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -763,6 +976,15 @@ function NotesTab() {
   ];
 
   if (loading) return <div className="flex justify-center py-12"><Spinner /></div>;
+
+  if (!isSuperAdmin && !user?.college_id) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-muted text-lg mb-2">No college assigned yet</p>
+        <p className="text-muted text-sm">Please contact the super admin to get a college assigned to your account before managing notes.</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -1020,9 +1242,10 @@ function ModelsTab() {
 function StudentsTab({ user }) {
   const [students, setStudents] = useState([]);
   const [college, setCollege] = useState(null);
+  const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', year: '', semester: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', program_id: '', year: '', semester: '' });
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -1031,8 +1254,13 @@ function StudentsTab({ user }) {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, colleges] = await Promise.all([fetchStudents(), fetchColleges()]);
+      const [s, colleges, progs] = await Promise.all([
+        fetchStudents(),
+        fetchColleges(),
+        fetchPrograms(user?.college_id || undefined),
+      ]);
       setStudents(s);
+      setPrograms(progs);
       // Find the admin's own college by college_id
       if (user?.college_id) {
         setCollege(colleges.find(c => c.id === user.college_id) || null);
@@ -1043,6 +1271,11 @@ function StudentsTab({ user }) {
 
   useEffect(() => { reload(); }, [reload]);
 
+  // Compute max year/semester from the selected program
+  const selectedProgram = programs.find(p => p.id === form.program_id);
+  const maxYear = selectedProgram ? selectedProgram.duration : undefined;
+  const maxSemester = selectedProgram ? selectedProgram.duration * 2 : undefined;
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -1052,11 +1285,12 @@ function StudentsTab({ user }) {
         name: form.name,
         email: form.email,
         password: form.password,
+        program_id: form.program_id || undefined,
         year: form.year ? parseInt(form.year) : undefined,
         semester: form.semester ? parseInt(form.semester) : undefined,
       });
       setShowModal(false);
-      setForm({ name: '', email: '', password: '', year: '', semester: '' });
+      setForm({ name: '', email: '', password: '', program_id: '', year: '', semester: '' });
       reload();
     } catch (err) { setError(err.message); }
     setSubmitting(false);
@@ -1068,6 +1302,14 @@ function StudentsTab({ user }) {
     catch (err) { setActionError(err.message); }
   };
 
+  const handleDelete = async (userId, email) => {
+    if (!confirm(`Delete student "${email}"?\n\nThis action cannot be undone.`)) return;
+    setActionError('');
+    try { await deleteStudent(userId); reload(); }
+    catch (err) { setActionError(err.message); }
+  };
+
+  const programMap = Object.fromEntries(programs.map(p => [p.id, p]));
   const filtered = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.email.toLowerCase().includes(search.toLowerCase())
@@ -1080,6 +1322,16 @@ function StudentsTab({ user }) {
       <div className="py-12 text-center">
         <p className="text-muted text-lg mb-2">No college assigned yet</p>
         <p className="text-muted text-sm">Please contact the super admin to get a college assigned to your account before managing students.</p>
+      </div>
+    );
+  }
+
+  // No programs available — show prompt
+  if (programs.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-muted text-lg mb-2">No programs available</p>
+        <p className="text-muted text-sm">Please create a program first before adding students.</p>
       </div>
     );
   }
@@ -1108,7 +1360,7 @@ function StudentsTab({ user }) {
               <tr className="border-b border-border">
                 <th className="text-left p-4 font-medium text-muted">Name</th>
                 <th className="text-left p-4 font-medium text-muted">Email</th>
-                <th className="text-left p-4 font-medium text-muted">College</th>
+                <th className="text-left p-4 font-medium text-muted">Program</th>
                 <th className="text-left p-4 font-medium text-muted">Year / Sem</th>
                 <th className="text-left p-4 font-medium text-muted">Status</th>
                 <th className="text-left p-4 font-medium text-muted">Joined</th>
@@ -1120,7 +1372,7 @@ function StudentsTab({ user }) {
                 <tr key={s.id} className="border-b border-border hover:bg-hover">
                   <td className="p-4 font-medium text-foreground">{s.name}</td>
                   <td className="p-4 text-muted">{s.email}</td>
-                  <td className="p-4 text-muted">{college?.short_name || '—'}</td>
+                  <td className="p-4 text-muted">{programMap[s.program_id]?.short_name || '—'}</td>
                   <td className="p-4 text-muted text-sm">
                     {s.year ? `Year ${s.year}` : '—'}{s.semester ? ` / Sem ${s.semester}` : ''}
                   </td>
@@ -1133,13 +1385,16 @@ function StudentsTab({ user }) {
                     {new Date(s.created_at).toLocaleDateString()}
                   </td>
                   <td className="p-4">
-                    <Button
-                      variant={s.is_active ? 'ghost' : 'primary'}
-                      size="sm"
-                      onClick={() => handleToggle(s.id)}
-                    >
-                      {s.is_active ? 'Disable' : 'Enable'}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={s.is_active ? 'ghost' : 'primary'}
+                        size="sm"
+                        onClick={() => handleToggle(s.id)}
+                      >
+                        {s.is_active ? 'Disable' : 'Enable'}
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-error" onClick={() => handleDelete(s.id, s.email)}>Delete</Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1171,9 +1426,34 @@ function StudentsTab({ user }) {
               {college ? `${college.icon ? college.icon + ' ' : ''}${college.name}` : 'Your college'}
             </div>
           </div>
+          <Select
+            label="Program"
+            value={form.program_id}
+            onChange={(e) => setForm({ ...form, program_id: e.target.value, year: '', semester: '' })}
+            options={[{ value: '', label: 'Select program' }, ...programs.map(p => ({ value: p.id, label: `${p.name} (${p.duration} yrs)` }))]}
+            required
+          />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Year" type="number" placeholder="e.g. 1" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
-            <Input label="Semester" type="number" placeholder="e.g. 1" value={form.semester} onChange={(e) => setForm({ ...form, semester: e.target.value })} />
+            <Select
+              label={`Year${maxYear ? ` (max ${maxYear})` : ''}`}
+              value={form.year}
+              onChange={(e) => setForm({ ...form, year: e.target.value })}
+              options={[
+                { value: '', label: 'Select year' },
+                ...Array.from({ length: maxYear || 4 }, (_, i) => ({ value: String(i + 1), label: `Year ${i + 1}` })),
+              ]}
+              required
+            />
+            <Select
+              label={`Semester${maxSemester ? ` (max ${maxSemester})` : ''}`}
+              value={form.semester}
+              onChange={(e) => setForm({ ...form, semester: e.target.value })}
+              options={[
+                { value: '', label: 'Select semester' },
+                ...Array.from({ length: maxSemester || 8 }, (_, i) => ({ value: String(i + 1), label: `Semester ${i + 1}` })),
+              ]}
+              required
+            />
           </div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
