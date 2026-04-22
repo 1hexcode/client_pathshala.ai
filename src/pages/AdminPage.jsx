@@ -915,6 +915,11 @@ function NotesTab({ isSuperAdmin, user }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('pending'); // pending | published | all
 
+  const [rejectNoteId, setRejectNoteId] = useState(null);
+  const [rejectNoteTitle, setRejectNoteTitle] = useState('');
+  const [rejectFeedback, setRejectFeedback] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -937,11 +942,28 @@ function NotesTab({ isSuperAdmin, user }) {
     catch (err) { setActionError(err.message); }
   };
 
-  const handleReject = async (id, title) => {
-    if (!confirm(`Reject note "${title}"?`)) return;
+  const promptReject = (id, title) => {
+    setRejectNoteId(id);
+    setRejectNoteTitle(title);
+    setRejectFeedback('');
     setActionError('');
-    try { await rejectNote(id); load(); }
+  };
+
+  const handleRejectSubmit = async (e) => {
+    e.preventDefault();
+    if (!rejectFeedback.trim()) {
+      setActionError("Feedback is required to reject a note.");
+      return;
+    }
+    setRejectSubmitting(true);
+    setActionError('');
+    try { 
+      await rejectNote(rejectNoteId, rejectFeedback); 
+      setRejectNoteId(null);
+      load(); 
+    }
     catch (err) { setActionError(err.message); }
+    finally { setRejectSubmitting(false); }
   };
 
   const handleDelete = async (id, title) => {
@@ -1061,7 +1083,7 @@ function NotesTab({ isSuperAdmin, user }) {
                             variant="ghost"
                             size="sm"
                             className="text-error"
-                            onClick={() => handleReject(n.id, n.title)}
+                            onClick={() => promptReject(n.id, n.title)}
                           >
                             Reject
                           </Button>
@@ -1090,6 +1112,27 @@ function NotesTab({ isSuperAdmin, user }) {
           </table>
         </div>
       </Card>
+
+      {/* Reject Note Modal */}
+      <Modal isOpen={!!rejectNoteId} onClose={() => setRejectNoteId(null)} title="Reject Note">
+        <form onSubmit={handleRejectSubmit} className="space-y-4">
+          <p className="text-sm text-muted">Provide a reason for rejecting "{rejectNoteTitle}". This will be visible to the student.</p>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-foreground">Feedback / Reason</label>
+            <textarea
+              className="w-full px-4 py-2 rounded-xl border border-border bg-surface text-foreground placeholder:text-muted focus:ring-2 focus:ring-primary focus:border-transparent transition-all min-h-[100px] resize-y"
+              value={rejectFeedback}
+              onChange={(e) => setRejectFeedback(e.target.value)}
+              placeholder="e.g., Unclear handwriting, missing pages..."
+              required
+            ></textarea>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setRejectNoteId(null)}>Cancel</Button>
+            <Button type="submit" variant="primary" className="flex-1 !bg-red-500 hover:!bg-red-600 border-none text-white shadow-md shadow-red-500/20" loading={rejectSubmitting}>Reject Note</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

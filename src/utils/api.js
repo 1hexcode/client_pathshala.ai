@@ -236,8 +236,11 @@ export async function publishNote(id) {
     return request(`/notes/${id}/publish`, { method: 'PATCH' });
 }
 
-export async function rejectNote(id) {
-    return request(`/notes/${id}/reject`, { method: 'PATCH' });
+export async function rejectNote(id, feedback) {
+    return request(`/notes/${id}/reject`, { 
+        method: 'PATCH',
+        body: JSON.stringify({ feedback_text: feedback })
+    });
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────

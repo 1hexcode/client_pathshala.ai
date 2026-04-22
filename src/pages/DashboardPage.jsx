@@ -179,6 +179,9 @@ export function DashboardPage() {
                       <p className="text-sm text-muted">
                         {formatFileSize(note.file_size)} • {note.downloads} downloads • {note.views} views
                       </p>
+                      {note.status === 'failed' && note.feedback && (
+                        <p className="text-sm text-red-500 mt-1 line-clamp-1">Feedback: <span className="font-medium">{note.feedback.feedback_text}</span></p>
+                      )}
                     </div>
                     <Badge variant={note.status === 'ready' ? 'success' : note.status === 'failed' ? 'error' : 'warning'}>
                       {note.status === 'ready' ? 'Published' : note.status === 'processing' ? 'Processing' : note.status === 'failed' ? 'Rejected' : 'Pending Review'}

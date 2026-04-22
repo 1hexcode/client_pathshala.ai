@@ -154,17 +154,21 @@ const Navbar = () => {
 
             {/* Auth: Profile or Login/Signup */}
             {isAuthenticated ? (
-              <Dropdown
-                align="right"
-                trigger={
-                  <button className="flex items-center gap-2 p-1.5 rounded-full hover:bg-[var(--color-bg-secondary)] transition-colors">
-                    <Avatar name={user.name} size="sm" />
-                    <svg className="w-4 h-4 text-[var(--color-text-muted)] hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                }
-              >
+              <div className="flex items-center gap-1">
+                <Link to="/profile" className="flex items-center rounded-full hover:ring-2 hover:ring-[var(--color-primary)] transition-all mr-1" title="Go to Profile">
+                  <Avatar name={user?.name || 'User'} size="sm" />
+                </Link>
+
+                <Dropdown
+                  align="right"
+                  trigger={
+                    <button className="flex items-center p-1.5 rounded-full hover:bg-[var(--color-bg-secondary)] transition-colors cursor-pointer" title="Menu">
+                      <svg className="w-5 h-5 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  }
+                >
                 <div className="px-4 py-3 border-b border-[var(--border-color)]">
                   <p className="font-medium text-[var(--color-text-primary)]">{user.name}</p>
                   <p className="text-sm text-[var(--color-text-muted)]">{user.email}</p>
@@ -206,6 +210,7 @@ const Navbar = () => {
                   Sign Out
                 </Dropdown.Item>
               </Dropdown>
+              </div>
             ) : (
               <div className="flex items-center gap-2">
                 <Link

@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 const Dropdown = ({
   trigger,
@@ -25,6 +26,12 @@ const Dropdown = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Close on route change
+  const location = useLocation();
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location?.pathname]);
 
   // Close on escape key
   useEffect(() => {
